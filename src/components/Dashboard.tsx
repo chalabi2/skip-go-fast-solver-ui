@@ -14,7 +14,6 @@ export const Dashboard: React.FC = () => {
 
   const {
     chainBalances,
-    gasMetrics,
     profitMetrics,
     chainProfits,
     selectedChain,
@@ -223,17 +222,21 @@ export const Dashboard: React.FC = () => {
       {/* Header */}
       <div className="bg-white shadow-lg relative z-10">
         <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center gap-4">
-              <h1 className="text-2xl font-bold">
-                <span className="text-black">Skip Go Gas Solver Dashboard</span>
+          <div className="flex flex-col sm:flex-row justify-between items-center py-4 gap-4">
+            <div className="flex items-center gap-4 w-full sm:w-auto sm:text-center">
+              <h1 className="text-xl sm:text-2xl font-bold">
+                <span className="text-black">
+                  Skip Go Fast Solver Dashboard
+                </span>
               </h1>
             </div>
-            <div className="flex items-center gap-4">
-              <span className="text-gray-600">{user?.email}</span>
+            <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 w-full sm:w-auto">
+              <span className="text-gray-600 text-sm sm:text-base">
+                {user?.email}
+              </span>
               <button
                 onClick={signOut}
-                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors"
+                className="w-full sm:w-auto bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors"
               >
                 Sign Out
               </button>
@@ -267,7 +270,7 @@ export const Dashboard: React.FC = () => {
 
           <div className="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow">
             <h2 className="text-xl font-semibold mb-2 text-skip-pink">
-              Total Volume Alltime
+              Total Volume All Time
             </h2>
             <p className="text-3xl ">
               $
@@ -280,7 +283,7 @@ export const Dashboard: React.FC = () => {
 
           <div className="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow">
             <h2 className="text-xl font-semibold mb-2 text-skip-yellow">
-              Total Fees Alltime
+              Total Fees All Time
             </h2>
             <p className="text-3xl text-green-600">
               $
@@ -342,11 +345,11 @@ export const Dashboard: React.FC = () => {
         {/* Settlement Details Table */}
         <h2 className="text-2xl font-bold mb-4">Settlement Details</h2>
         <div className="bg-white p-6 rounded-lg shadow overflow-x-auto mb-8">
-          <div className="flex gap-2 mb-4">
+          <div className="flex flex-wrap gap-2 mb-4">
             {CHAIN_CONFIGS.map((config) => (
               <button
                 key={config.domain}
-                className={`px-4 py-2 rounded-lg ${
+                className={`px-3 py-1.5 text-sm rounded-lg ${
                   selectedChain === config.domain.toString()
                     ? "bg-blue-500 text-white"
                     : "bg-gray-100 hover:bg-gray-200"
@@ -377,14 +380,6 @@ export const Dashboard: React.FC = () => {
                   {sortField === "profit" &&
                     (sortDirection === "asc" ? "↑" : "↓")}
                 </th>
-                <th
-                  className="text-left px-4 py-2 cursor-pointer hover:bg-gray-50"
-                  onClick={() => handleSort("timestamp")}
-                >
-                  Time{" "}
-                  {sortField === "timestamp" &&
-                    (sortDirection === "asc" ? "↑" : "↓")}
-                </th>
               </tr>
             </thead>
             <tbody>
@@ -394,16 +389,21 @@ export const Dashboard: React.FC = () => {
                 ).map((order) => (
                   <tr key={order.orderId} className="border-t">
                     <td className="px-4 py-2 font-medium">
-                      {order.orderId.slice(0, 8)}...
+                      <span
+                        className="cursor-pointer hover:text-blue-500"
+                        onClick={() =>
+                          navigator.clipboard.writeText(order.orderId)
+                        }
+                        title="Click to copy full order ID"
+                      >
+                        {order.orderId.slice(0, 8)}...
+                      </span>
                     </td>
                     <td className="px-4 py-2">
                       {Number(order.amount).toLocaleString()}
                     </td>
                     <td className="px-4 py-2 text-green-600">
                       {Number(order.profit).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-2 text-gray-500">
-                      {new Date(order.timestamp * 1000).toLocaleString()}
                     </td>
                   </tr>
                 ))}
@@ -424,35 +424,6 @@ export const Dashboard: React.FC = () => {
               <p className="text-2xl">{balance.balance.toFixed(2)} USDC</p>
             </div>
           ))}
-        </div>
-
-        {/* Gas Balances */}
-        <h2 className="text-2xl font-bold mb-4">Gas Balances</h2>
-        <div className="bg-white p-6 rounded-lg shadow overflow-x-auto mb-8">
-          <table className="min-w-full">
-            <thead>
-              <tr>
-                <th className="text-left px-4 py-2">Chain</th>
-                <th className="text-left px-4 py-2">Gas Token</th>
-                <th className="text-left px-4 py-2">Balance</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(gasMetrics || []).map((metric, index) => (
-                <tr key={index} className="border-t">
-                  <td className="px-4 py-2">
-                    {metric.metric.source_chain_name}
-                  </td>
-                  <td className="px-4 py-2">
-                    {metric.metric.gas_token_symbol}
-                  </td>
-                  <td className="px-4 py-2">
-                    {Number(metric.value[1]).toFixed(4)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </div>
     </div>

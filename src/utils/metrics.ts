@@ -274,29 +274,7 @@ export async function calculateChainProfits(
   return getSettlementDetailsForChain(chainConfig, orders);
 }
 
-// Gas balance tracking
-export async function getGasBalances(): Promise<GasMetric[]> {
-  try {
-    const results = await queryPrometheus('solver_gas_balance_gauge');
-    console.log('Gas balance results:', results);
-    
-    return results
-      .filter((result: PrometheusQueryResult) => result.metric?.chain_id && result.metric?.chain_name)
-      .map((result: PrometheusQueryResult) => ({
-        metric: {
-          source_chain_id: result.metric?.source_chain_id,
-          source_chain_name: result.metric?.source_chain_name,
-          gas_token_symbol: result.metric?.gas_token_symbol,
-          gas_balance: Number(result.metric?.gas_balance || 0),
-        },
-        value: [Number(result.value[0] || 0), Number(result.value[1] || 0)] as [number, number]
-      }))
-      .sort((a: GasMetric, b: GasMetric) => a.metric.source_chain_name.localeCompare(b.metric.source_chain_name));
-  } catch (error) {
-    console.error('Error getting gas balances:', error);
-    return [];
-  }
-}
+
 
 // USDC balance tracking
 export async function getUSDCBalance(config: ChainConfig): Promise<ChainBalance> {

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { 
   CHAIN_CONFIGS, 
   calculateChainProfits, 
-  getGasBalances, 
+
   getUSDCBalance,
   type GasMetric,
   type ChainBalance,
@@ -40,12 +40,6 @@ export function useDashboard() {
     refetchInterval: POLLING_INTERVAL,
   });
 
-  // Query for gas metrics
-  const { data: gasMetrics, isLoading: isLoadingGas } = useQuery<GasMetric[]>({
-    queryKey: ['gasMetrics'],
-    queryFn: getGasBalances,
-    refetchInterval: POLLING_INTERVAL,
-  });
 
   // Query for USDC balances
   const balanceQueries = useQueries({
@@ -116,7 +110,7 @@ export function useDashboard() {
     chainBalances: balanceQueries
       .filter(query => query.data)
       .map(query => query.data!) as ChainBalance[],
-    gasMetrics: gasMetrics || [],
+   
     chainProfits,
     selectedChain,
   };
@@ -124,7 +118,7 @@ export function useDashboard() {
   return {
     ...dashboardState,
     setSelectedChain,
-    isLoading: isLoadingOrders || isLoadingGas || chainProfitsQueries.some(query => query.isLoading) || balanceQueries.some(query => query.isLoading),
+    isLoading: isLoadingOrders  || chainProfitsQueries.some(query => query.isLoading) || balanceQueries.some(query => query.isLoading),
     isError: chainProfitsQueries.some(query => query.isError) || balanceQueries.some(query => query.isError),
   };
 } 

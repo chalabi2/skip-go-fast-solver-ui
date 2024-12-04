@@ -54,7 +54,6 @@ export interface SettlementDetails {
 export interface DashboardState {
   orderMetrics: OrderMetrics | null;
   chainBalances: ChainBalance[];
-  gasMetrics: GasMetric[];
   profitMetrics: ChainProfitMetric[];
   settlementDetails: SettlementDetails[];
   chainProfits: Record<string, ChainProfits>;
