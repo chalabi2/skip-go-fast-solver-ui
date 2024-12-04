@@ -4,9 +4,7 @@ import { useState } from 'react';
 import { 
   CHAIN_CONFIGS, 
   calculateChainProfits, 
-
   getUSDCBalance,
-  type GasMetric,
   type ChainBalance,
   type ChainProfitResult,
   type OrderWithProfit

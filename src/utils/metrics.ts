@@ -2,9 +2,6 @@ import { ethers } from 'ethers';
 import { BASE_TRANSFER_GATEWAY_ABI } from '../constants/abis';
 import { ChainConfig } from '../types';
 
-// Constants
-const PROMETHEUS_URL = 'http://66.172.36.131:8001';
-
 // Chain configurations
 export const CHAIN_CONFIGS: ChainConfig[] = [
   {
@@ -106,61 +103,6 @@ export interface PrometheusQueryResult {
 // Add this near the top with other interfaces
 interface ErrorWithCode extends Error {
   code?: string;
-}
-
-// Helper functions
-async function queryPrometheus(query: string): Promise<PrometheusQueryResult[]> {
-  try {
-    const response = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=${encodeURIComponent(query)}`);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const text = await response.text();
-    
-    // Parse Prometheus text format
-    const results: PrometheusQueryResult[] = [];
-    const lines = text.split('\n');
-    
-    for (const line of lines) {
-      // Skip comments and empty lines
-      if (line.startsWith('#') || !line.trim()) continue;
-      
-      // Parse metric line
-      const match = line.match(/^([^{]+)({[^}]+})?\s+([0-9.e+-]+)(\s+[0-9]+)?$/);
-      if (!match) continue;
-      
-      const [, name, labels = '{}', value] = match;
-      
-      // Parse labels
-      const labelObj: Record<string, string> = {};
-      const labelMatches = labels.matchAll(/{([^{}]+)}/g);
-      for (const labelMatch of labelMatches) {
-        const labelPairs = labelMatch[1].split(',');
-        for (const pair of labelPairs) {
-          const [key, val] = pair.split('=');
-          if (key && val) {
-            labelObj[key.trim()] = val.trim().replace(/^"(.*)"$/, '$1');
-          }
-        }
-      }
-      
-      if (name.trim() === 'solver_gas_balance_gauge') {
-        results.push({
-          metric: {
-            __name__: name.trim(),
-            ...labelObj
-          },
-          value: [Date.now() / 1000, parseFloat(value)]
-        });
-      }
-    }
-    
-    console.log('Parsed Prometheus results:', results);
-    return results;
-  } catch (error) {
-    console.error('Error querying Prometheus:', error);
-    return [];
-  }
 }
 
 // Settlement and profit calculation
