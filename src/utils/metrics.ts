@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import { MAILBOX_ABI, FAST_TRANSFER_GATEWAY_ABI, GOFAST_ABI, BASE_TRANSFER_GATEWAY_ABI } from '../constants/abis';
+import { BASE_TRANSFER_GATEWAY_ABI } from '../constants/abis';
 import { ChainConfig } from '../types';
 
 // Constants

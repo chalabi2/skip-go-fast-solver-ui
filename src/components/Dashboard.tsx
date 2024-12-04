@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useDashboard } from "../hooks/useDashboard";
 import { CHAIN_CONFIGS } from "../utils/metrics";
-import type { OrderWithProfit } from "../utils/metrics";
+
 import { useAuth } from "../context/AuthContext";
 
 type SortField = "amount" | "profit" | "timestamp";

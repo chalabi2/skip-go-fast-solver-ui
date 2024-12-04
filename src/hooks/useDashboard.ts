@@ -1,5 +1,5 @@
 import { useQuery, useQueries } from '@tanstack/react-query';
-import { ethers } from 'ethers';
+
 import { useState } from 'react';
 import { 
   CHAIN_CONFIGS, 
