@@ -94,8 +94,22 @@ export interface ChainBalance {
   balance: number;
 }
 
+// Add this interface near the other interfaces
+export interface PrometheusQueryResult {
+  metric: {
+    __name__: string;
+    [key: string]: string;
+  };
+  value: [number, number];
+}
+
+// Add this near the top with other interfaces
+interface ErrorWithCode extends Error {
+  code?: string;
+}
+
 // Helper functions
-async function queryPrometheus(query: string) {
+async function queryPrometheus(query: string): Promise<PrometheusQueryResult[]> {
   try {
     const response = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=${encodeURIComponent(query)}`);
     if (!response.ok) {
@@ -104,7 +118,7 @@ async function queryPrometheus(query: string) {
     const text = await response.text();
     
     // Parse Prometheus text format
-    const results: any[] = [];
+    const results: PrometheusQueryResult[] = [];
     const lines = text.split('\n');
     
     for (const line of lines) {
@@ -198,9 +212,10 @@ async function getSettlementDetailsForChain(
           };
         }
         return null;
-      } catch (error: any) {
+      } catch (error) {
+        const err = error as ErrorWithCode;
         // Handle specific error cases
-        if (error?.code === 'CALL_EXCEPTION' && retryCount < 3) {
+        if (err.code === 'CALL_EXCEPTION' && retryCount < 3) {
           // Add exponential backoff delay
           await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
           return processOrder(order, retryCount + 1);
@@ -266,8 +281,8 @@ export async function getGasBalances(): Promise<GasMetric[]> {
     console.log('Gas balance results:', results);
     
     return results
-      .filter((result: any) => result.metric?.chain_id && result.metric?.chain_name)
-      .map((result: any) => ({
+      .filter((result: PrometheusQueryResult) => result.metric?.chain_id && result.metric?.chain_name)
+      .map((result: PrometheusQueryResult) => ({
         metric: {
           source_chain_id: result.metric?.source_chain_id,
           source_chain_name: result.metric?.source_chain_name,
