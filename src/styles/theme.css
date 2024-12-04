@@ -1,0 +1,93 @@
+:root {
+  --skip-yellow: #ffc800;
+  --skip-pink: #ff69f8;
+  --skip-blue: #0066ff;
+  --skip-black: #000000;
+  --skip-white: #ffffff;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.bg-skip-yellow {
+  background-color: var(--skip-yellow);
+}
+
+.bg-skip-pink {
+  background-color: var(--skip-pink);
+}
+
+.bg-skip-blue {
+  background-color: var(--skip-blue);
+}
+
+.text-skip-yellow {
+  color: var(--skip-yellow);
+}
+
+.text-skip-pink {
+  color: var(--skip-pink);
+}
+
+.text-skip-blue {
+  color: var(--skip-blue);
+}
+
+.hover-spin:hover {
+  animation: spin 2s linear infinite;
+}
+
+.hover-float:hover {
+  animation: float 3s ease-in-out infinite;
+}
+
+.hover-pulse:hover {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.click-spin {
+  transition: transform 0.3s ease;
+}
+
+.click-spin:active {
+  animation: spin 0.5s linear;
+}
+
+/* Background patterns */
+.pattern-grid {
+  background-image: linear-gradient(var(--skip-blue) 2px, transparent 2px),
+    linear-gradient(90deg, var(--skip-blue) 2px, transparent 2px);
+  background-size: 30px 30px;
+  background-position: -2px -2px;
+  opacity: 0.1;
+}
