@@ -38,8 +38,8 @@ interface GasInfo {
   totalDepositedUSD: number;
 }
 
-const API_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://solver.chandratation.com/api'
+const API_URL = import.meta.env.VITE_NODE_ENV === 'production' 
+  ? 'https://skip-go-fast-solver-ui.vercel.app/api'
   : 'http://localhost:3001/api';
 
 export const api = {
