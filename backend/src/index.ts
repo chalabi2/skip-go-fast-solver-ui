@@ -31,7 +31,11 @@ const gasTrackingConfigs: Record<number, GasTrackingSyncConfig> = Object.entries
 const gasTrackingService = new GasTrackingService(CHAIN_CONFIGS, gasTrackingConfigs);
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ['https://solver.chandratation.com', 'http://localhost:5173'],
+  methods: ['GET', 'POST'],
+  credentials: true
+}));
 app.use(express.json());
 
 // Add a basic health check endpoint

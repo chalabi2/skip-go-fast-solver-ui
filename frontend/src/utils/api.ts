@@ -38,9 +38,13 @@ interface GasInfo {
   totalDepositedUSD: number;
 }
 
+const API_URL = process.env.NODE_ENV === 'production' 
+  ? 'https://solver.chandratation.com/api'
+  : 'http://localhost:3001/api';
+
 export const api = {
   async getSettlements(): Promise<SettlementsResponse> {
-    const response = await fetch('/api/settlements');
+    const response = await fetch(`${API_URL}/settlements`);
     if (!response.ok) {
       throw new Error('Failed to fetch settlements');
     }
@@ -48,7 +52,7 @@ export const api = {
   },
 
   async getSyncStatus(): Promise<SyncStatus[]> {
-    const response = await fetch('/api/sync-status');
+    const response = await fetch(`${API_URL}/sync-status`);
     if (!response.ok) {
       throw new Error('Failed to fetch sync status');
     }
@@ -56,7 +60,7 @@ export const api = {
   },
 
   async getGasInfo(): Promise<Record<number, GasInfo>> {
-    const response = await fetch('/api/gas-info');
+    const response = await fetch(`${API_URL}/gas-info`);
     if (!response.ok) {
       throw new Error('Failed to fetch gas info');
     }
