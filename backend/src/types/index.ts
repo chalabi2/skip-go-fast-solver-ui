@@ -16,6 +16,15 @@ export interface SyncConfig {
   deploymentBlock: number;
 }
 
+export interface GasTrackingSyncConfig {
+  domain: number;
+  nativeToken: string;
+  wrappedTokenAddress: string;
+  priceGroup: 'ETH' | 'MATIC' | 'AVAX';
+  decimals: number;
+  deploymentBlock: number;
+}
+
 export interface SettlementDetails {
   orderId: string;
   chainId: number;

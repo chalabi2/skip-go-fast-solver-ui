@@ -60,9 +60,18 @@ The application will be available at `http://localhost:5173`
 ```
 src/
   ├── components/     # React components
-  ├── hooks/         # Custom React hooks
-  ├── utils/         # Utility functions
-  └── types/         # TypeScript type definitions
+  ├── constants/      # Constants
+  ├── contexts/       # Auth context
+  ├── hooks/          # Custom React hooks
+  ├── pages/          # React pages
+  ├── styles/         # Tailwind styles
+  ├── types/          # TypeScript types
+  ├── utils/          # Utility functions
+  ├── App.tsx         # Main App component
+  ├── env.d.ts        # Environment variable types
+  ├── index.css       # Global styles
+  ├── main.tsx        # ReactDOM entry point
+  └── types.ts      # TypeScript types
 ```
 
 ## Building for Production

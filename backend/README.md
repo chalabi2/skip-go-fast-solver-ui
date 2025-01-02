@@ -89,8 +89,7 @@ You can get a Moralis API key [here](https://moralis.io/api-key-for-moralis-dapp
 
 ### Settlements
 
-- `GET /api/settlements` - Get settlement data with optional filters
-  - Query params: `chainId`, `startDate`, `endDate`, `status`
+- `GET /api/settlements` - Get settlement data
 
 ### Chain Status
 
@@ -124,11 +123,10 @@ The service follows these key principles:
 
 ```
 src/
-  ├── controllers/   # Route controllers
   ├── services/     # Business logic
   ├── utils/        # Helper functions
   ├── types/        # TypeScript types
-  └── routes/       # API routes
+  └── index.ts      # API routes
 prisma/
   ├── schema.prisma # Database schema
   └── migrations/   # Database migrations

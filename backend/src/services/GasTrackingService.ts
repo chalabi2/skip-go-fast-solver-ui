@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import { PrismaClient } from '@prisma/client';
-import { ChainConfig, SyncConfig } from '../types';
+import { ChainConfig, GasTrackingSyncConfig } from '../types';
 import { logger } from '../utils/logger';
 import Moralis from 'moralis';
 
@@ -18,43 +18,60 @@ interface ChainTokenInfo {
   nativeToken: string;
   wrappedTokenAddress: string;
   priceGroup: 'ETH' | 'MATIC' | 'AVAX';
+  decimals: number;
+}
+
+interface NativeTransfer {
+  direction: string;
+  token_symbol: string;
+  value: string;
+}
+
+interface Transaction {
+  nativeTransfers?: NativeTransfer[];
 }
 
 export class GasTrackingService {
   private prisma: PrismaClient;
   private providers: Map<number, ethers.JsonRpcProvider> = new Map();
   private _isSyncing: boolean = false;
-  private readonly configs: Record<number, SyncConfig>;
+  private readonly configs: Record<number, GasTrackingSyncConfig>;
   private readonly chainTokens: Record<number, ChainTokenInfo> = {
     1: { 
       nativeToken: 'ETH',
       wrappedTokenAddress: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // WETH
-      priceGroup: 'ETH'
+      priceGroup: 'ETH',
+      decimals: 18
     },
     137: { 
       nativeToken: 'MATIC',
       wrappedTokenAddress: '0x7D1AfA7B718fb893dB30A3aBc0Cfc608AaCfeBB0', // WMATIC on ETH
-      priceGroup: 'MATIC'
+      priceGroup: 'MATIC',
+      decimals: 18
     },
     43114: { 
       nativeToken: 'AVAX',
       wrappedTokenAddress: '0x85f138bfEE4ef8e540890CFb48F620571d67Eda3', // WAVAX on ETH
-      priceGroup: 'AVAX'
+      priceGroup: 'AVAX',
+      decimals: 18
     },
     10: { 
       nativeToken: 'ETH',
       wrappedTokenAddress: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // WETH
-      priceGroup: 'ETH'
+      priceGroup: 'ETH',
+      decimals: 18
     },
     42161: { 
       nativeToken: 'ETH',
       wrappedTokenAddress: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // WETH
-      priceGroup: 'ETH'
+      priceGroup: 'ETH',
+      decimals: 18
     },
     8453: { 
       nativeToken: 'ETH',
       wrappedTokenAddress: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // WETH
-      priceGroup: 'ETH'
+      priceGroup: 'ETH',
+      decimals: 18
     }
   };
 
@@ -71,7 +88,7 @@ export class GasTrackingService {
   private lastTransactionSync: Record<number, number> = {};
   private readonly TRANSACTION_SYNC_INTERVAL = 4 * 60 * 60 * 1000; // 4 hours in milliseconds
 
-  constructor(chainConfigs: ChainConfig[], syncConfigs: Record<number, SyncConfig>) {
+  constructor(chainConfigs: ChainConfig[], syncConfigs: Record<number, GasTrackingSyncConfig>) {
     this.prisma = new PrismaClient();
     this.configs = syncConfigs;
     chainConfigs.forEach(config => {
@@ -200,22 +217,45 @@ export class GasTrackingService {
     return now - lastSync >= this.TRANSACTION_SYNC_INTERVAL;
   }
 
-  private calculateTotalDeposits(transactions: any[]): number {
-    return transactions
-      .filter(tx => tx.native_transfers?.length > 0)
-      .reduce((total: number, tx) => {
-        // Find all incoming native transfers in this transaction
-        const deposits = tx.native_transfers
-          .filter((transfer: { direction: string; internal_transaction: boolean; to_address: string }) => 
-            transfer.direction === "receive" && 
-            !transfer.internal_transaction &&
-            transfer.to_address?.toLowerCase() === SOLVER_ADDRESS.toLowerCase()
-          )
-          .map((transfer: { value_formatted: string }) => Number(transfer.value_formatted))
-          .reduce((sum: number, amount: number) => sum + amount, 0);
+  private calculateTotalDeposits(transactions: Transaction[], chainId: number): string {
+    logger.info(`Calculating total deposits from ${transactions.length} transactions`);
+    
+    // Get native token symbol for this chain
+    const chainConfig = Object.values(this.configs).find((c: GasTrackingSyncConfig) => c.domain === chainId);
+    if (!chainConfig) {
+      logger.warn(`No chain config found for chain ID ${chainId}`);
+      return '0';
+    }
 
-        return total + deposits;
-      }, 0);
+    const nativeTokenSymbol = chainConfig.nativeToken;
+    logger.info(`Looking for native transfers with token symbol: ${nativeTokenSymbol}`);
+    
+    // Filter and sum native token transfers
+    const totalDeposits = transactions.reduce((sum, tx) => {
+      const nativeTransfers = tx.nativeTransfers || [];
+      
+      const relevantTransfers = nativeTransfers.filter(transfer => {
+        const isReceive = transfer.direction === "receive";
+        const isNativeToken = transfer.token_symbol === nativeTokenSymbol;
+        logger.debug(`Transfer - Direction: ${transfer.direction}, Token: ${transfer.token_symbol}, Value: ${transfer.value}, IsRelevant: ${isReceive && isNativeToken}`);
+        return isReceive && isNativeToken;
+      });
+
+      logger.debug(`Found ${relevantTransfers.length} relevant transfers in transaction`);
+
+      const transferSum = relevantTransfers.reduce((transferTotal, transfer) => {
+        return transferTotal + BigInt(transfer.value);
+      }, BigInt(0));
+
+      return sum + transferSum;
+    }, BigInt(0));
+
+    logger.info(`Total deposits calculated: ${totalDeposits.toString()} ${nativeTokenSymbol}`);
+    return totalDeposits.toString();
+  }
+
+  private getChainHexId(chainId: number): string {
+    return `0x${chainId.toString(16)}`;
   }
 
   async syncGasInfo(chainConfig: ChainConfig): Promise<void> {
@@ -240,11 +280,7 @@ export class GasTrackingService {
       }
 
       // Get last sync block
-      const lastSync = await this.getLastSync(chainConfig.domain);
       const currentBlock = await provider.getBlockNumber();
-      const fromBlock = lastSync ? Number(lastSync.lastSyncBlock) : syncConfig.deploymentBlock;
-
-      logger.info(`[GasTracking][${chainConfig.name}] Fetching gas info from block ${fromBlock} to ${currentBlock}`);
 
       // Get current balance and format it
       const currentBalance = await provider.getBalance(SOLVER_ADDRESS);
@@ -252,65 +288,8 @@ export class GasTrackingService {
       
       logger.info(`[GasTracking][${chainConfig.name}] Current balance: ${currentBalanceFormatted} ${this.chainTokens[chainConfig.domain].nativeToken} (${currentBalance.toString()} wei)`);
 
-      let totalDepositedFormatted = 0;
-      
-      // Get existing total deposited value from database
-      const existingData = await this.prisma.gasTracking.findUnique({
-        where: { chainId: chainConfig.domain },
-        select: { totalDeposited: true, lastSyncBlock: true }
-      });
-
-      // Only use cached value if it's non-zero
-      if (existingData?.totalDeposited && Number(existingData.totalDeposited) > 0) {
-        totalDepositedFormatted = Number(existingData.totalDeposited);
-        logger.info(`[GasTracking][${chainConfig.name}] Found cached total deposits: ${totalDepositedFormatted} ${this.chainTokens[chainConfig.domain].nativeToken}`);
-      }
-
-      // Fetch transaction history if cache is empty or sync interval passed
-      if (Number(totalDepositedFormatted) <= 0 || this.shouldSyncTransactions(chainConfig.domain)) {
-        try {
-          logger.info(`[GasTracking][${chainConfig.name}] Fetching new transaction history from Moralis`);
-          
-          const startBlock = existingData ? Number(existingData.lastSyncBlock) : syncConfig.deploymentBlock;
-          
-          let cursor: string | undefined = undefined;
-          let allTransactions: any[] = [];
-
-          do {
-            const response = await Moralis.EvmApi.wallets.getWalletHistory({
-              chain: chainConfig.domain.toString(), 
-              address: SOLVER_ADDRESS,
-              fromBlock: startBlock,
-              cursor
-            });
-
-            const result = response.toJSON().result;
-            if (result && result.length > 0) {
-              allTransactions = allTransactions.concat(result);
-              cursor = response.toJSON().cursor;
-              logger.info(`[GasTracking][${chainConfig.name}] Fetched ${result.length} transactions, total so far: ${allTransactions.length}`);
-            } else {
-              cursor = undefined;
-            }
-          } while (cursor);
-
-          // Calculate total deposits using the new helper method
-          totalDepositedFormatted = this.calculateTotalDeposits(allTransactions);
-
-          logger.info(`[GasTracking][${chainConfig.name}] Updated total deposits: ${totalDepositedFormatted} ${this.chainTokens[chainConfig.domain].nativeToken}`);
-          
-          // Update last sync timestamp
-          this.lastTransactionSync[chainConfig.domain] = Date.now();
-        } catch (error) {
-          logger.error(`[GasTracking][${chainConfig.name}] Error fetching transaction history:`, error);
-          // Keep existing total if there's an error
-          totalDepositedFormatted = existingData ? Number(existingData.totalDeposited) : 0;
-        }
-      } else {
-        // Use existing total deposited value
-        totalDepositedFormatted = existingData ? Number(existingData.totalDeposited) : 0;
-        logger.info(`[GasTracking][${chainConfig.name}] Using cached total deposits: ${totalDepositedFormatted} ${this.chainTokens[chainConfig.domain].nativeToken}`);
-      }
+      // Set total deposited to 0 (removing Moralis history lookup)
+      const totalDepositedFormatted = 0;
 
       // Get token price from cache
       const chainToken = this.chainTokens[chainConfig.domain];
@@ -318,7 +297,7 @@ export class GasTrackingService {
 
       // Calculate USD values
       const currentBalanceUSD = currentBalanceFormatted * tokenPriceUSD;
-      const totalDepositedUSD = totalDepositedFormatted * tokenPriceUSD;
+      const totalDepositedUSD = 0; // Set to 0 since we're not tracking deposits
 
       logger.info(`[GasTracking][${chainConfig.name}] Current balance in USD: $${currentBalanceUSD.toFixed(2)}`);
       logger.info(`[GasTracking][${chainConfig.name}] Total deposited in USD: $${totalDepositedUSD.toFixed(2)}`);

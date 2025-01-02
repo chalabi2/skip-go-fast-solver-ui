@@ -6,12 +6,29 @@ import { GasTrackingService } from './services/GasTrackingService';
 import { CHAIN_CONFIGS } from './utils/constants';
 import { logger } from './utils/logger';
 import { PrismaClient } from '@prisma/client';
+import { SettlementDetails, ChainSyncStatus, GasTrackingSyncConfig } from './types';
 
 const app = express();
 const port = process.env.PORT || 3001;
 const prisma = new PrismaClient();
 const syncService = new BlockchainSyncService();
-const gasTrackingService = new GasTrackingService(CHAIN_CONFIGS, syncService.configs);
+
+// Map sync configs to gas tracking configs
+const gasTrackingConfigs: Record<number, GasTrackingSyncConfig> = Object.entries(syncService.configs).reduce((acc, [chainId, config]) => ({
+  ...acc,
+  [chainId]: {
+    domain: Number(chainId),
+    nativeToken: chainId === '137' ? 'MATIC' : chainId === '43114' ? 'AVAX' : 'ETH',
+    wrappedTokenAddress: chainId === '137' ? '0x7D1AfA7B718fb893dB30A3aBc0Cfc608AaCfeBB0' : 
+                        chainId === '43114' ? '0x85f138bfEE4ef8e540890CFb48F620571d67Eda3' : 
+                        '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+    priceGroup: chainId === '137' ? 'MATIC' : chainId === '43114' ? 'AVAX' : 'ETH',
+    decimals: 18,
+    deploymentBlock: config.deploymentBlock
+  }
+}), {});
+
+const gasTrackingService = new GasTrackingService(CHAIN_CONFIGS, gasTrackingConfigs);
 
 // Middleware
 app.use(cors());
@@ -96,7 +113,12 @@ app.get('/api/settlements', async (req, res) => {
     logger.info('Expected settlement counts from Osmosis:', expectedCountsByChain);
   
     // Group settlements by chainId with verification and include gas info
-    const groupedSettlements = settlements.reduce((acc, settlement) => {
+    const groupedSettlements = settlements.reduce((acc: Record<number, { 
+      chainName: string; 
+      settlements: any[]; 
+      total: number;
+      expectedTotal: number;
+    }>, settlement: SettlementDetails) => {
       const chainId = settlement.chainId;
       const chainName = CHAIN_CONFIGS.find(c => c.domain === chainId)?.name || 'Unknown';
       
@@ -168,7 +190,7 @@ app.get('/api/sync-status', async (req, res) => {
     logger.info(`Found ${syncStatus.length} chain sync records`);
     
     // Convert BigInt to string in the response
-    const serializedStatus = syncStatus.map(status => ({
+    const serializedStatus = syncStatus.map((status: ChainSyncStatus) => ({
       ...status,
       lastSyncBlock: status.lastSyncBlock.toString(),
       chainName: CHAIN_CONFIGS.find(c => c.domain === status.chainId)?.name || 'Unknown'
@@ -209,7 +231,20 @@ app.get('/api/gas-info', async (req, res) => {
       ORDER BY "chainId" ASC
     `;
     
-    const formattedGasInfo = gasInfo.reduce((acc, info) => {
+    const formattedGasInfo = gasInfo.reduce((acc: Record<number, {
+      chainName: string;
+      currentBalance: string;
+      totalDeposited: string;
+      currentBalanceUSD: number;
+      totalDepositedUSD: number;
+    }>, info: {
+      chainId: number;
+      chainName: string;
+      currentBalance: string;
+      totalDeposited: string;
+      currentBalanceUSD: string;
+      totalDepositedUSD: string;
+    }) => {
       acc[info.chainId] = {
         chainName: info.chainName,
         currentBalance: info.currentBalance,
@@ -249,12 +284,12 @@ app.listen(port, async () => {
     });
     
     logger.info('Current sync status:');
-    currentSyncStatus.forEach(status => {
+    currentSyncStatus.forEach((status: ChainSyncStatus) => {
       logger.info(`${CHAIN_CONFIGS.find(c => c.domain === status.chainId)?.name}: Block ${status.lastSyncBlock.toString()}`);
     });
 
     // Initialize sync for chains that don't have a sync record
-    const syncedChainIds = new Set(currentSyncStatus.map(s => s.chainId));
+    const syncedChainIds = new Set(currentSyncStatus.map((s: ChainSyncStatus) => s.chainId));
     const chainsToInitialize = CHAIN_CONFIGS.filter(c => !syncedChainIds.has(c.domain));
     
     if (chainsToInitialize.length > 0) {
@@ -267,8 +302,14 @@ app.listen(port, async () => {
   // Initial parallel sync for all chains
   try {
     logger.info('Starting initial parallel sync for all chains');
-    await syncService.syncAllChains(CHAIN_CONFIGS);
+    await Promise.all([
+      syncService.syncAllChains(CHAIN_CONFIGS),
+      gasTrackingService.syncAllChains(CHAIN_CONFIGS)
+    ]);
     logger.info('Completed initial parallel sync for all chains');
+
+    // Initial token price update
+    await gasTrackingService.updateTokenPrices();
   } catch (error) {
     logger.error('Failed initial parallel sync:', error);
   }
