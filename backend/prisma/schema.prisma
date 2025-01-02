@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Settlement {
+  id          String   @id @default(uuid())
+  orderId     String
+  chainId     Int
+  chainName   String
+  amount      Decimal  @db.Decimal(20, 6)
+  profit      Decimal  @db.Decimal(20, 6)
+  timestamp   DateTime
+  blockNumber BigInt
+  status      String   @default("COMPLETED")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([orderId, chainId])
+  @@index([chainId, timestamp])
+  @@index([status])
+}
+
+model ChainSync {
+  chainId        Int      @id
+  lastSyncBlock  BigInt
+  lastSyncTime   DateTime
+  lastUpdateTime DateTime @updatedAt
+}
+
+model GasTracking {
+  chainId           Int      @id
+  chainName         String
+  currentBalance    Decimal  @db.Decimal(36, 18)
+  totalDeposited    Decimal  @db.Decimal(36, 18)
+  currentBalanceUSD Decimal  @db.Decimal(20, 6)
+  totalDepositedUSD Decimal  @db.Decimal(20, 6)
+  lastSyncBlock     BigInt
+  lastSyncTime      DateTime
+  lastUpdateTime    DateTime @updatedAt
+
+  @@index([chainId])
+}
+
+model TokenPrice {
+  id            String   @id
+  priceGroup    String   @unique
+  priceUSD      Decimal  @db.Decimal(20, 6)
+  lastUpdateTime DateTime @updatedAt
+} 
