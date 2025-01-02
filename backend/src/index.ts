@@ -269,6 +269,11 @@ app.get('/api/gas-info', async (req, res) => {
   }
 });
 
+// Add this near your other routes
+app.get('/test', (req, res) => {
+  res.json({ message: 'Backend is running!' });
+});
+
 // Start the server
 app.listen(port, async () => {
   logger.info(`Server is running on port ${port}`);
