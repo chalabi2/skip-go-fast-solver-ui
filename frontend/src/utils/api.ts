@@ -39,31 +39,30 @@ interface GasInfo {
 }
 
 const API_URL = import.meta.env.VITE_NODE_ENV === 'production' 
-  ? 'https://skip-go-fast-solver-ui.vercel.app/api'
-  : 'http://localhost:3001/api';
+  ? 'https://skip-go-fast-solver-ui.vercel.app/api/'
+  : 'http://localhost:3001/api/';
+
+const fetchData = async (endpoint: string) => {
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include'
+  });
+  return response.json();
+};
 
 export const api = {
   async getSettlements(): Promise<SettlementsResponse> {
-    const response = await fetch(`${API_URL}/settlements`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch settlements');
-    }
-    return response.json();
+    return fetchData('settlements');
   },
 
   async getSyncStatus(): Promise<SyncStatus[]> {
-    const response = await fetch(`${API_URL}/sync-status`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch sync status');
-    }
-    return response.json();
+    return fetchData('sync-status');
   },
 
   async getGasInfo(): Promise<Record<number, GasInfo>> {
-    const response = await fetch(`${API_URL}/gas-info`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch gas info');
-    }
-    return response.json();
+    return fetchData('gas-info');
   }
 }; 

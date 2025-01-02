@@ -32,10 +32,16 @@ const gasTrackingService = new GasTrackingService(CHAIN_CONFIGS, gasTrackingConf
 
 // Middleware
 app.use(cors({
-  origin: ['https://solver.chandratation.com', 'http://localhost:5173'],
-  methods: ['GET', 'POST'],
-  credentials: true
+  origin: [
+    'https://solver.chandrastation.com',
+    'http://localhost:5173',
+    'https://skip-go-fast-solver-ui.vercel.app'
+  ],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+app.options('*', cors()); // Enable pre-flight for all routes
 app.use(express.json());
 
 // Add a basic health check endpoint
