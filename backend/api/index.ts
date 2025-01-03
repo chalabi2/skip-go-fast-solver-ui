@@ -1,12 +1,12 @@
 import express from 'express';
 import cron from 'node-cron';
 import cors from 'cors';
-import { BlockchainSyncService } from './services/BlockchainSyncService';
-import { GasTrackingService } from './services/GasTrackingService';
-import { CHAIN_CONFIGS } from './utils/constants';
-import { logger } from './utils/logger';
+import { BlockchainSyncService } from '../src/services/BlockchainSyncService';
+import { GasTrackingService } from '../src/services/GasTrackingService';
+import { CHAIN_CONFIGS } from '../src/utils/constants';
+import { logger } from '../src/utils/logger';
 import { PrismaClient } from '@prisma/client';
-import { SettlementDetails, ChainSyncStatus, GasTrackingSyncConfig } from './types';
+import { SettlementDetails, ChainSyncStatus, GasTrackingSyncConfig } from '../src/types';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -78,6 +78,26 @@ cron.schedule('*/5 * * * *', async () => {
   }
 });
 
+// Add this interface to define the grouped settlements structure
+interface GroupedSettlement {
+  chainName: string;
+  settlements: Array<{
+    chainId: number;
+    id: string;
+    orderId: string;
+    chainName: string;
+    amount: string;
+    profit: string;
+    timestamp: Date;
+    blockNumber: string;
+    status: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
+  total: number;
+  expectedTotal: number;
+}
+
 // API endpoints
 app.get('/api/settlements', async (req, res) => {
   try {
@@ -123,12 +143,7 @@ app.get('/api/settlements', async (req, res) => {
     logger.info('Expected settlement counts from Osmosis:', expectedCountsByChain);
   
     // Group settlements by chainId with verification and include gas info
-    const groupedSettlements = settlements.reduce((acc: Record<number, { 
-      chainName: string; 
-      settlements: any[]; 
-      total: number;
-      expectedTotal: number;
-    }>, settlement: SettlementDetails) => {
+    const groupedSettlements = settlements.reduce((acc: Record<number, GroupedSettlement>, settlement) => {
       const chainId = settlement.chainId;
       const chainName = CHAIN_CONFIGS.find(c => c.domain === chainId)?.name || 'Unknown';
       
@@ -137,8 +152,7 @@ app.get('/api/settlements', async (req, res) => {
           chainName,
           settlements: [],
           total: 0,
-          expectedTotal: expectedCountsByChain[chainId] || 0,
-        
+          expectedTotal: expectedCountsByChain[chainId] || 0
         };
       }
       
@@ -151,13 +165,7 @@ app.get('/api/settlements', async (req, res) => {
       acc[chainId].total++;
       
       return acc;
-    }, {} as Record<number, { 
-      chainName: string; 
-      settlements: any[]; 
-      total: number;
-      expectedTotal: number;
-   
-    }>);
+    }, {});
 
     // Add chains that have expected settlements but no actual settlements yet
     Object.entries(expectedCountsByChain).forEach(([chainId, count]) => {
@@ -168,8 +176,7 @@ app.get('/api/settlements', async (req, res) => {
           chainName,
           settlements: [],
           total: 0,
-          expectedTotal: count,
-         
+          expectedTotal: count
         };
       }
     });
