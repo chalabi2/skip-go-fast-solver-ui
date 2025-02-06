@@ -34,7 +34,7 @@ const gasTrackingService = new GasTrackingService(CHAIN_CONFIGS, gasTrackingConf
 app.use(cors({
   origin: [
     'https://solver.chandrastation.com',
-    'http://localhost:5173',
+    'http://localhost:3000',
     'https://skip-go-fast-solver-ui.vercel.app'
   ],
   methods: ['GET', 'POST', 'OPTIONS'],
