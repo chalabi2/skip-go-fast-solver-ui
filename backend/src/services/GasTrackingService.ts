@@ -31,6 +31,50 @@ interface Transaction {
   nativeTransfers?: NativeTransfer[];
 }
 
+interface EtherscanResponse {
+  status: string;
+  message: string;
+  result: Array<{
+    timeStamp: string;
+    from: string;
+    to: string;
+    value: string;
+    isError: string;
+  }>;
+}
+
+interface ExplorerConfig {
+  apiUrl: string;
+  apiKey?: string;
+}
+
+const EXPLORER_CONFIGS: Record<number, ExplorerConfig> = {
+  1: {
+    apiUrl: 'https://api.etherscan.io/api',
+    apiKey: process.env.ETHERSCAN_API_KEY
+  },
+  10: {
+    apiUrl: 'https://api-optimistic.etherscan.io/api',
+    apiKey: process.env.OPTIMISM_API_KEY
+  },
+  137: {
+    apiUrl: 'https://api.polygonscan.com/api',
+    apiKey: process.env.POLYGONSCAN_API_KEY
+  },
+  42161: {
+    apiUrl: 'https://api.basescan.org/api',
+    apiKey: process.env.BASESCAN_API_KEY
+  },
+  8453: {
+    apiUrl: 'https://api.basescan.org/api',
+    apiKey: process.env.BASESCAN_API_KEY
+  },
+  43114: {
+    apiUrl: 'https://api.snowtrace.io/api',
+    apiKey: undefined // No API key needed
+  }
+};
+
 export class GasTrackingService {
   private prisma: PrismaClient;
   private providers: Map<number, ethers.JsonRpcProvider> = new Map();
@@ -258,6 +302,51 @@ export class GasTrackingService {
     return `0x${chainId.toString(16)}`;
   }
 
+  private async getTotalDeposited(chainId: number): Promise<string> {
+    const config = EXPLORER_CONFIGS[chainId];
+    if (!config) {
+      throw new Error(`No explorer config for chain ${chainId}`);
+    }
+
+    try {
+      const params = new URLSearchParams({
+        module: 'account',
+        action: 'txlist',
+        address: SOLVER_ADDRESS,
+        startblock: '0',
+        endblock: '99999999',
+        sort: 'asc'
+      });
+
+      if (config.apiKey) {
+        params.append('apikey', config.apiKey);
+      }
+
+      const response = await fetch(`${config.apiUrl}?${params.toString()}`);
+      const data = await response.json() as EtherscanResponse;
+
+      if (data.status !== '1') {
+        throw new Error(`Explorer API error: ${data.message}`);
+      }
+
+      // Sum up all incoming transactions
+      const totalDeposited = data.result.reduce((sum, tx) => {
+        if (
+          tx.to.toLowerCase() === SOLVER_ADDRESS.toLowerCase() &&
+          tx.isError === '0'
+        ) {
+          return sum + BigInt(tx.value);
+        }
+        return sum;
+      }, BigInt(0));
+
+      return totalDeposited.toString();
+    } catch (error) {
+      logger.error(`Failed to fetch total deposits for chain ${chainId}:`, error);
+      throw error;
+    }
+  }
+
   async syncGasInfo(chainConfig: ChainConfig): Promise<void> {
     const syncConfig = this.configs[chainConfig.domain];
     if (!syncConfig) {
@@ -288,8 +377,8 @@ export class GasTrackingService {
       
       logger.info(`[GasTracking][${chainConfig.name}] Current balance: ${currentBalanceFormatted} ${this.chainTokens[chainConfig.domain].nativeToken} (${currentBalance.toString()} wei)`);
 
-      // Set total deposited to 0 (removing Moralis history lookup)
-      const totalDepositedFormatted = 0;
+      // Get total deposited from explorer API
+      const totalDeposited = await this.getTotalDeposited(chainConfig.domain);
 
       // Get token price from cache
       const chainToken = this.chainTokens[chainConfig.domain];
@@ -297,7 +386,7 @@ export class GasTrackingService {
 
       // Calculate USD values
       const currentBalanceUSD = currentBalanceFormatted * tokenPriceUSD;
-      const totalDepositedUSD = 0; // Set to 0 since we're not tracking deposits
+      const totalDepositedUSD = Number(ethers.formatEther(BigInt(totalDeposited))) * tokenPriceUSD;
 
       logger.info(`[GasTracking][${chainConfig.name}] Current balance in USD: $${currentBalanceUSD.toFixed(2)}`);
       logger.info(`[GasTracking][${chainConfig.name}] Total deposited in USD: $${totalDepositedUSD.toFixed(2)}`);
@@ -318,8 +407,8 @@ export class GasTrackingService {
         VALUES (
           ${chainConfig.domain},
           ${chainConfig.name},
-          ${currentBalanceFormatted}::decimal,
-          ${totalDepositedFormatted}::decimal,
+          ${Number(ethers.formatEther(currentBalance))}::decimal,
+          ${Number(ethers.formatEther(BigInt(totalDeposited)))}::decimal,
           ${currentBalanceUSD}::decimal,
           ${totalDepositedUSD}::decimal,
           ${currentBlock}::bigint,

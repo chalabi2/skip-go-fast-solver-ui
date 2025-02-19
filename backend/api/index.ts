@@ -101,37 +101,33 @@ interface GroupedSettlement {
 // API endpoints
 app.get('/api/settlements', async (req, res) => {
   try {
-    // Add timeout to the sync operation
-    const syncPromise = Promise.all([
-      syncService.syncAllChains(CHAIN_CONFIGS),
-      gasTrackingService.syncAllChains(CHAIN_CONFIGS)
-    ]);
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Sync timeout')), 30000);
-    });
-
-    try {
-      await Promise.race([syncPromise, timeoutPromise]);
-    } catch (error: any) {
-      logger.warn('Sync timed out or failed, proceeding with existing data');
-    }
-    
-    // Get raw count per chain first for verification
-    const chainCounts = await prisma.settlement.groupBy({
-      by: ['chainId'],
-      _count: {
-        _all: true
-      }
-    });
-    
-    logger.info('Raw settlement counts per chain:', chainCounts);
-    
     // Get all settlements ordered by timestamp
     const settlements = await prisma.settlement.findMany({
       orderBy: {
         timestamp: 'desc'
       }
     });
+
+    // Only trigger sync if we haven't synced in the last 5 minutes
+    const lastSyncTime = await prisma.chainSync.findFirst({
+      orderBy: {
+        lastSyncTime: 'desc'
+      }
+    });
+
+    const SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
+    const shouldSync = !lastSyncTime || 
+      (Date.now() - lastSyncTime.lastSyncTime.getTime()) > SYNC_INTERVAL;
+
+    if (shouldSync) {
+      // Run sync in background without waiting for it
+      Promise.all([
+        syncService.syncAllChains(CHAIN_CONFIGS),
+        gasTrackingService.syncAllChains(CHAIN_CONFIGS)
+      ]).catch(error => {
+        logger.error('Background sync failed:', error);
+      });
+    }
 
     // Get Osmosis orders to determine expected counts
     const osmosisOrders = await syncService.fetchOsmosisOrders();
@@ -184,7 +180,8 @@ app.get('/api/settlements', async (req, res) => {
     res.json({
       settlements: groupedSettlements,
       totalSettlements: settlements.length,
-      expectedTotalSettlements: osmosisOrders.length
+      expectedTotalSettlements: osmosisOrders.length,
+      lastSyncTime: lastSyncTime?.lastSyncTime || null
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -299,6 +296,18 @@ app.listen(port, async () => {
     logger.error('Database connection test failed:', error);
   }
 
+  // Reset the last sync time to trigger a fresh sync
+  try {
+    await prisma.chainSync.updateMany({
+      data: {
+        lastSyncTime: new Date(0) // Set to Unix epoch to force a sync
+      }
+    });
+    logger.info('Reset sync timestamps to trigger fresh sync');
+  } catch (error) {
+    logger.error('Failed to reset sync timestamps:', error);
+  }
+
   // Log current sync status
   try {
     const currentSyncStatus = await prisma.chainSync.findMany({
@@ -316,6 +325,18 @@ app.listen(port, async () => {
     
     if (chainsToInitialize.length > 0) {
       logger.info('Initializing sync for new chains:', chainsToInitialize.map(c => c.name).join(', '));
+      
+      // Create initial sync records for new chains
+      await Promise.all(chainsToInitialize.map(chain => 
+        prisma.chainSync.create({
+          data: {
+            chainId: chain.domain,
+            lastSyncBlock: BigInt(0),
+            lastSyncTime: new Date(0),
+            lastUpdateTime: new Date()
+          }
+        })
+      ));
     }
   } catch (error) {
     logger.error('Error checking sync status:', error);
@@ -328,6 +349,15 @@ app.listen(port, async () => {
       syncService.syncAllChains(CHAIN_CONFIGS),
       gasTrackingService.syncAllChains(CHAIN_CONFIGS)
     ]);
+    
+    // Update all chain sync times to now after successful sync
+    await prisma.chainSync.updateMany({
+      data: {
+        lastSyncTime: new Date(),
+        lastUpdateTime: new Date()
+      }
+    });
+    
     logger.info('Completed initial parallel sync for all chains');
 
     // Initial token price update

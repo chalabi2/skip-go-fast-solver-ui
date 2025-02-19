@@ -187,6 +187,10 @@ export const Dashboard: React.FC = () => {
     (acc, metric) => acc + (metric?.metrics?.settledOrders || 0),
     0
   );
+  const totalOrdersTotal = (profitMetrics || []).reduce(
+    (acc, metric) => acc + (metric?.metrics?.totalOrders || 0),
+    0
+  );
 
   const largestOrder = Object.values(chainProfits || {}).reduce(
     (max, chain) => {
@@ -212,6 +216,23 @@ export const Dashboard: React.FC = () => {
   );
 
   const chartData = transformChainProfitsToChartData(chainProfits);
+
+  const profitCalculations = {
+    totalProfit: (profitMetrics || []).reduce(
+      (acc, metric) => acc + (metric?.metrics?.totalFees || BigInt(0)),
+      BigInt(0)
+    ),
+    gasSpent: Object.values(gasInfo || {}).reduce((acc, chain) => {
+      // Calculate how much gas was spent (deposited - current balance)
+      const spent = chain.totalDepositedUSD - chain.currentBalanceUSD;
+      return acc + spent;
+    }, 0),
+    get netProfit() {
+      // Convert totalProfit from BigInt (with 6 decimals) to number
+      const totalProfitUSD = Number(this.totalProfit) / 1e6;
+      return totalProfitUSD - this.gasSpent;
+    },
+  };
 
   return (
     <div className="min-h-screen bg-vercel-background text-vercel-foreground">
@@ -305,12 +326,17 @@ export const Dashboard: React.FC = () => {
         )}
 
         {/* Summary Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <div className="bg-vercel-card-background border border-vercel-border p-6 rounded-lg hover:bg-vercel-card-hovered transition-all">
             <h2 className="text-xl font-semibold mb-2 text-vercel-foreground">
               Total Orders Settled
             </h2>
-            <p className="text-3xl text-vercel-foreground">{totalOrders}</p>
+            <p className="text-3xl">
+              <span className="text-vercel-success">{totalOrders}</span>
+
+              {" / "}
+              <span className="text-red-500">{totalOrdersTotal}</span>
+            </p>
           </div>
 
           <div className="bg-vercel-card-background border border-vercel-border p-6 rounded-lg hover:bg-vercel-card-hovered transition-all">
@@ -320,6 +346,19 @@ export const Dashboard: React.FC = () => {
             <p className="text-3xl text-vercel-foreground">
               $
               {(Number(totalVolume) / 1e6).toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </p>
+          </div>
+
+          <div className="bg-vercel-card-background border border-vercel-border p-6 rounded-lg hover:bg-vercel-card-hovered transition-all">
+            <h2 className="text-xl font-semibold mb-2 text-vercel-foreground">
+              Total Profit
+            </h2>
+            <p className="text-3xl text-vercel-success">
+              $
+              {profitCalculations.netProfit.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}

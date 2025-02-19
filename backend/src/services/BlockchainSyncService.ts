@@ -151,8 +151,29 @@ export class BlockchainSyncService {
       throw new Error(`No sync config found for chain ${chainConfig.domain}`);
     }
 
-    const chainOrders = osmosisOrders.filter(order => order.source_domain === chainConfig.domain);
-    logger.info(`[${chainConfig.name}] Found ${chainOrders.length} orders from Osmosis`);
+    // Filter out orders we already have data for
+    const existingSettlements = await this.prisma.settlement.findMany({
+      where: {
+        chainId: chainConfig.domain,
+        status: 'COMPLETED'
+      },
+      select: {
+        orderId: true
+      }
+    });
+    const existingOrderIds = new Set(existingSettlements.map(s => s.orderId.toLowerCase()));
+    
+    const chainOrders = osmosisOrders.filter(order => {
+      const orderIdHex = order.order_id.startsWith('0x') ? order.order_id : `0x${order.order_id}`;
+      return order.source_domain === chainConfig.domain && !existingOrderIds.has(orderIdHex.toLowerCase());
+    });
+
+    if (chainOrders.length === 0) {
+      logger.info(`[${chainConfig.name}] No new orders to process`);
+      return;
+    }
+
+    logger.info(`[${chainConfig.name}] Processing ${chainOrders.length} new orders from Osmosis`);
 
     try {
       const provider = new ethers.JsonRpcProvider(chainConfig.rpcUrl);
@@ -166,14 +187,14 @@ export class BlockchainSyncService {
         provider
       );
 
-      // First, get all settlement events since deployment
+      // Only fetch settlement events for new orders
       const currentBlock = await provider.getBlockNumber();
       const deploymentBlock = Number(this.configs[chainConfig.domain].deploymentBlock);
       const settlementTopic = ethers.id('OrderSettled(bytes32)');
 
       logger.info(`[${chainConfig.name}] Fetching settlement events from block ${deploymentBlock} to ${currentBlock}`);
 
-      // Get all settlement events
+      // Get settlement events
       const allSettlementLogs = await getLogsWithRetry(
         provider,
         {
@@ -184,8 +205,6 @@ export class BlockchainSyncService {
         },
         this.configs[chainConfig.domain]
       );
-
-      logger.info(`[${chainConfig.name}] Found ${allSettlementLogs.length} settlement events`);
 
       // Create a map of orderId to event details
       const settlementMap = new Map<string, ethers.Log>();
