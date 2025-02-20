@@ -7,13 +7,10 @@
   },
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/api/(.*)",
       "dest": "/api/index.ts"
     }
   ],
-  "env": {
-    "API_KEY": "@api_key"
-  },
   "buildCommand": "bun run build",
   "outputDirectory": "dist",
   "devCommand": "bun run dev",
