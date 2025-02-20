@@ -38,15 +38,10 @@ interface GasInfo {
   totalDepositedUSD: number;
 }
 
-const API_URL = import.meta.env.VITE_NODE_ENV === 'production' 
-  ? 'https://solver.chandrastation.com/api/'
-  : 'http://localhost:3000/api/';
-
-  const API_KEY = import.meta.env.VITE_API_KEY;
-
+const API_KEY = import.meta.env.VITE_API_KEY;
 
 const fetchData = async (endpoint: string) => {
-  const response = await fetch(`${API_URL}${endpoint}`, {
+  const response = await fetch(`/api/${endpoint}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',

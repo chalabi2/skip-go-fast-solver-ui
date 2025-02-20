@@ -39,7 +39,7 @@ app.use(cors({
   ],
   methods: ['GET', 'POST', 'OPTIONS'],
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'X-API-Key']
 }));
 app.options('*', cors()); // Enable pre-flight for all routes
 app.use(express.json());

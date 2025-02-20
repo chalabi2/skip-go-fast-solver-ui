@@ -20,7 +20,7 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: process.env.VITE_NODE_ENV === 'production' 
-          ? 'https://solver.chandrastation.com'
+          ? 'https://skip-go-fast-solver-7uhj8sjcc-chalabi.vercel.app'
           : 'http://localhost:3001',
         changeOrigin: true
       }
