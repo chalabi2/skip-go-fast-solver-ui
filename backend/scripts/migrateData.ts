@@ -15,20 +15,20 @@ async function migrateData() {
   });
 
   try {
+    // Delete existing data in target database
+    console.log('Deleting existing data in target database...');
+    await targetDb.settlement.deleteMany({});
+    await targetDb.chainSync.deleteMany({});
+    await targetDb.gasTracking.deleteMany({});
+    console.log('Existing data deleted successfully');
+
     // Migrate settlements
     const settlements = await sourceDb.settlement.findMany();
     console.log(`Found ${settlements.length} settlements to migrate`);
     
     for (const settlement of settlements) {
-      await targetDb.settlement.upsert({
-        where: {
-          orderId_chainId: {
-            orderId: settlement.orderId,
-            chainId: settlement.chainId
-          }
-        },
-        update: settlement,
-        create: settlement
+      await targetDb.settlement.create({
+        data: settlement
       });
     }
 
@@ -37,12 +37,8 @@ async function migrateData() {
     console.log(`Found ${chainSyncs.length} chain syncs to migrate`);
     
     for (const sync of chainSyncs) {
-      await targetDb.chainSync.upsert({
-        where: {
-          chainId: sync.chainId
-        },
-        update: sync,
-        create: sync
+      await targetDb.chainSync.create({
+        data: sync
       });
     }
 
@@ -51,12 +47,8 @@ async function migrateData() {
     console.log(`Found ${gasTrackings.length} gas tracking records to migrate`);
     
     for (const gas of gasTrackings) {
-      await targetDb.gasTracking.upsert({
-        where: {
-          chainId: gas.chainId
-        },
-        update: gas,
-        create: gas
+      await targetDb.gasTracking.create({
+        data: gas
       });
     }
 

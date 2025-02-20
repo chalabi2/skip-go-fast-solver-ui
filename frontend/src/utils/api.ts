@@ -39,17 +39,29 @@ interface GasInfo {
 }
 
 const API_URL = import.meta.env.VITE_NODE_ENV === 'production' 
-  ? 'https://skip-go-fast-solver-ui.vercel.app/api/'
-  : 'http://localhost:3001/api/';
+  ? 'https://solver.chandrastation.com/api/'
+  : 'http://localhost:3000/api/';
+
+  const API_KEY = import.meta.env.VITE_API_KEY;
+
 
 const fetchData = async (endpoint: string) => {
   const response = await fetch(`${API_URL}${endpoint}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
+      'X-API-Key': API_KEY
     },
     credentials: 'include'
   });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized - Invalid API key');
+    }
+    throw new Error(`API request failed: ${response.statusText}`);
+  }
+
   return response.json();
 };
 

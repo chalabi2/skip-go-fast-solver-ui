@@ -44,6 +44,21 @@ app.use(cors({
 app.options('*', cors()); // Enable pre-flight for all routes
 app.use(express.json());
 
+// Add API key middleware
+const apiKeyMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const apiKey = req.headers['x-api-key'] || req.headers['X-API-Key'];
+  
+  if (!apiKey || apiKey !== process.env.API_KEY) {
+    logger.warn('Unauthorized API access attempt');
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  next();
+};
+
+// Apply middleware to all routes except health check
+app.use(/^(?!\/health).*$/, apiKeyMiddleware);
+
 // Add a basic health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
