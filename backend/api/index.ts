@@ -46,7 +46,7 @@ app.use(express.json());
 
 // Add API key middleware
 const apiKeyMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  const apiKey = req.headers['x-api-key'] || req.headers['X-API-Key'];
+  const apiKey = req.headers['X-API-Key'];
   
   if (!apiKey || apiKey !== process.env.API_KEY) {
     logger.warn('Unauthorized API access attempt');
