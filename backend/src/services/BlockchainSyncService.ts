@@ -151,29 +151,28 @@ export class BlockchainSyncService {
       throw new Error(`No sync config found for chain ${chainConfig.domain}`);
     }
 
-    // Filter out orders we already have data for
+    // Get existing settlement order IDs for this chain
     const existingSettlements = await this.prisma.settlement.findMany({
-      where: {
+      where: { 
         chainId: chainConfig.domain,
         status: 'COMPLETED'
       },
-      select: {
-        orderId: true
-      }
+      select: { orderId: true }
     });
     const existingOrderIds = new Set(existingSettlements.map(s => s.orderId.toLowerCase()));
-    
+
+    // Filter out orders that have already been processed
     const chainOrders = osmosisOrders.filter(order => {
       const orderIdHex = order.order_id.startsWith('0x') ? order.order_id : `0x${order.order_id}`;
       return order.source_domain === chainConfig.domain && !existingOrderIds.has(orderIdHex.toLowerCase());
     });
 
+    logger.info(`[${chainConfig.name}] Found ${chainOrders.length} new orders from Osmosis (skipping ${existingOrderIds.size} existing orders)`);
+
     if (chainOrders.length === 0) {
       logger.info(`[${chainConfig.name}] No new orders to process`);
       return;
     }
-
-    logger.info(`[${chainConfig.name}] Processing ${chainOrders.length} new orders from Osmosis`);
 
     try {
       const provider = new ethers.JsonRpcProvider(chainConfig.rpcUrl);
@@ -187,14 +186,14 @@ export class BlockchainSyncService {
         provider
       );
 
-      // Only fetch settlement events for new orders
+      // First, get all settlement events since deployment
       const currentBlock = await provider.getBlockNumber();
       const deploymentBlock = Number(this.configs[chainConfig.domain].deploymentBlock);
       const settlementTopic = ethers.id('OrderSettled(bytes32)');
 
       logger.info(`[${chainConfig.name}] Fetching settlement events from block ${deploymentBlock} to ${currentBlock}`);
 
-      // Get settlement events
+      // Get all settlement events
       const allSettlementLogs = await getLogsWithRetry(
         provider,
         {
@@ -205,6 +204,8 @@ export class BlockchainSyncService {
         },
         this.configs[chainConfig.domain]
       );
+
+      logger.info(`[${chainConfig.name}] Found ${allSettlementLogs.length} settlement events`);
 
       // Create a map of orderId to event details
       const settlementMap = new Map<string, ethers.Log>();
@@ -252,6 +253,20 @@ export class BlockchainSyncService {
 
       // Update the last synced block to current
       await this.updateSyncProgress(chainConfig.domain, currentBlock);
+
+      // After successful processing of orders
+      await this.prisma.chainSync.update({
+        where: {
+          chainId: chainConfig.domain
+        },
+        data: {
+          lastSyncTime: new Date(),
+          lastUpdateTime: new Date(),
+          lastSyncBlock: currentBlock
+        }
+      });
+      
+      logger.info(`[${chainConfig.name}] Updated sync timestamp`);
     } catch (error) {
       logger.error(`[${chainConfig.name}] Chain sync failed:`, error);
       throw error;

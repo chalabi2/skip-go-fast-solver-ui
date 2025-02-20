@@ -59,7 +59,7 @@ cron.schedule('0 */4 * * *', async () => {
   }
 });
 
-// Modify the existing 5-minute cron to only sync data
+// Modify the 5-minute cron to update sync timestamps after successful sync
 cron.schedule('*/5 * * * *', async () => {
   if (syncService.isSyncing || gasTrackingService.isSyncing) {
     logger.warn('Previous sync still in progress, skipping this cron run');
@@ -72,7 +72,16 @@ cron.schedule('*/5 * * * *', async () => {
       syncService.syncAllChains(CHAIN_CONFIGS),
       gasTrackingService.syncAllChains(CHAIN_CONFIGS)
     ]);
-    logger.info('Completed parallel sync for all chains');
+
+    // Update lastSyncTime for all chains after successful sync
+    await prisma.chainSync.updateMany({
+      data: {
+        lastSyncTime: new Date(),
+        lastUpdateTime: new Date()
+      }
+    });
+
+    logger.info('Completed parallel sync for all chains and updated sync timestamps');
   } catch (error) {
     logger.error('Failed parallel sync:', error);
   }
@@ -101,33 +110,23 @@ interface GroupedSettlement {
 // API endpoints
 app.get('/api/settlements', async (req, res) => {
   try {
+    // Remove the sync operation entirely - just fetch existing data
+    // Get raw count per chain first for verification
+    const chainCounts = await prisma.settlement.groupBy({
+      by: ['chainId'],
+      _count: {
+        _all: true
+      }
+    });
+    
+    logger.info('Raw settlement counts per chain:', chainCounts);
+    
     // Get all settlements ordered by timestamp
     const settlements = await prisma.settlement.findMany({
       orderBy: {
         timestamp: 'desc'
       }
     });
-
-    // Only trigger sync if we haven't synced in the last 5 minutes
-    const lastSyncTime = await prisma.chainSync.findFirst({
-      orderBy: {
-        lastSyncTime: 'desc'
-      }
-    });
-
-    const SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
-    const shouldSync = !lastSyncTime || 
-      (Date.now() - lastSyncTime.lastSyncTime.getTime()) > SYNC_INTERVAL;
-
-    if (shouldSync) {
-      // Run sync in background without waiting for it
-      Promise.all([
-        syncService.syncAllChains(CHAIN_CONFIGS),
-        gasTrackingService.syncAllChains(CHAIN_CONFIGS)
-      ]).catch(error => {
-        logger.error('Background sync failed:', error);
-      });
-    }
 
     // Get Osmosis orders to determine expected counts
     const osmosisOrders = await syncService.fetchOsmosisOrders();
@@ -180,8 +179,7 @@ app.get('/api/settlements', async (req, res) => {
     res.json({
       settlements: groupedSettlements,
       totalSettlements: settlements.length,
-      expectedTotalSettlements: osmosisOrders.length,
-      lastSyncTime: lastSyncTime?.lastSyncTime || null
+      expectedTotalSettlements: osmosisOrders.length
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -292,47 +290,54 @@ app.listen(port, async () => {
   try {
     const count = await prisma.settlement.count();
     logger.info(`Database connection successful. Current settlement count: ${count}`);
+    
+    // Only do initial sync if no data exists
+    if (count === 0) {
+      logger.info('No existing settlements found, performing initial sync');
+      try {
+        await Promise.all([
+          syncService.syncAllChains(CHAIN_CONFIGS),
+          gasTrackingService.syncAllChains(CHAIN_CONFIGS)
+        ]);
+        
+        // Update sync times after successful initial sync
+        await prisma.chainSync.updateMany({
+          data: {
+            lastSyncTime: new Date(),
+            lastUpdateTime: new Date()
+          }
+        });
+        
+        logger.info('Completed initial data sync');
+      } catch (error) {
+        logger.error('Failed initial sync:', error);
+      }
+    } else {
+      logger.info('Existing settlements found, skipping initial sync');
+    }
   } catch (error) {
     logger.error('Database connection test failed:', error);
   }
 
-  // Reset the last sync time to trigger a fresh sync
-  try {
-    await prisma.chainSync.updateMany({
-      data: {
-        lastSyncTime: new Date(0) // Set to Unix epoch to force a sync
-      }
-    });
-    logger.info('Reset sync timestamps to trigger fresh sync');
-  } catch (error) {
-    logger.error('Failed to reset sync timestamps:', error);
-  }
-
-  // Log current sync status
+  // Initialize chain sync records if needed (keep this part)
   try {
     const currentSyncStatus = await prisma.chainSync.findMany({
       orderBy: { chainId: 'asc' }
     });
     
-    logger.info('Current sync status:');
-    currentSyncStatus.forEach((status: ChainSyncStatus) => {
-      logger.info(`${CHAIN_CONFIGS.find(c => c.domain === status.chainId)?.name}: Block ${status.lastSyncBlock.toString()}`);
-    });
-
     // Initialize sync for chains that don't have a sync record
     const syncedChainIds = new Set(currentSyncStatus.map((s: ChainSyncStatus) => s.chainId));
     const chainsToInitialize = CHAIN_CONFIGS.filter(c => !syncedChainIds.has(c.domain));
     
     if (chainsToInitialize.length > 0) {
-      logger.info('Initializing sync for new chains:', chainsToInitialize.map(c => c.name).join(', '));
+      logger.info('Initializing sync records for new chains:', chainsToInitialize.map(c => c.name).join(', '));
       
-      // Create initial sync records for new chains
       await Promise.all(chainsToInitialize.map(chain => 
         prisma.chainSync.create({
           data: {
             chainId: chain.domain,
             lastSyncBlock: BigInt(0),
-            lastSyncTime: new Date(0),
+            lastSyncTime: new Date(), // Use current time instead of epoch
             lastUpdateTime: new Date()
           }
         })
@@ -341,28 +346,11 @@ app.listen(port, async () => {
   } catch (error) {
     logger.error('Error checking sync status:', error);
   }
-  
-  // Initial parallel sync for all chains
-  try {
-    logger.info('Starting initial parallel sync for all chains');
-    await Promise.all([
-      syncService.syncAllChains(CHAIN_CONFIGS),
-      gasTrackingService.syncAllChains(CHAIN_CONFIGS)
-    ]);
-    
-    // Update all chain sync times to now after successful sync
-    await prisma.chainSync.updateMany({
-      data: {
-        lastSyncTime: new Date(),
-        lastUpdateTime: new Date()
-      }
-    });
-    
-    logger.info('Completed initial parallel sync for all chains');
 
-    // Initial token price update
+  // Initial token price update (keep this)
+  try {
     await gasTrackingService.updateTokenPrices();
   } catch (error) {
-    logger.error('Failed initial parallel sync:', error);
+    logger.error('Failed initial token price update:', error);
   }
 }); 
