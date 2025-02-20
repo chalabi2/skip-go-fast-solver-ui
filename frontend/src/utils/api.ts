@@ -39,7 +39,7 @@ interface GasInfo {
 }
 
 const API_URL = import.meta.env.VITE_NODE_ENV === 'production' 
-  ? 'https://skip-go-fast-solver-7uhj8sjcc-chalabi.vercel.app'
+  ? 'https://skip-go-fast-solver-ui.vercel.app/'
   : 'http://localhost:3000/api/';
 
   const API_KEY = import.meta.env.VITE_API_KEY;

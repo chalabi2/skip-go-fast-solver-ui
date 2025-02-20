@@ -24,7 +24,11 @@ Create a `.env` file with your Firebase configuration:
 VITE_FIREBASE_API_KEY=your_api_key
 VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain
 VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_API_KEY=your_api_key
+VITE_NODE_ENV=your_node_env
 ```
+
+> We also use a private API key to establish a secure connection between the frontend and backend. This can be generated with `openssl rand -base64 32`
 
 3. Start the development server:
 

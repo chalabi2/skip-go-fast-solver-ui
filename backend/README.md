@@ -45,7 +45,20 @@ OPTIMISM_RPC_URL=
 ARBITRUM_RPC_URL=
 BASE_RPC_URL=
 POLYGON_RPC_URL=
+
+# Etherscan API Key
+ETHERSCAN_API_KEY=
+SNOWTRACE_API_KEY=
+OPTIMISM_API_KEY=
+ARBISCAN_API_KEY=
+BASESCAN_API_KEY=
+POLYGONSCAN_API_KEY=
+
+# API Key for private frontend connection
+API_KEY=
 ```
+
+> We utilize the Moralis API to fetch price data and etherscan api's to fetch native token deposit history. You can sign up for all accounts for free and they provide a generous limit. We also use a private API key to establish a secure connection between the frontend and backend. This can be generated with `openssl rand -base64 32`
 
 3. Set up the database:
 
