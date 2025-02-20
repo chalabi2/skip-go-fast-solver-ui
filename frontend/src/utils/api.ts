@@ -38,10 +38,15 @@ interface GasInfo {
   totalDepositedUSD: number;
 }
 
-const API_KEY = import.meta.env.VITE_API_KEY;
+const API_URL = import.meta.env.VITE_NODE_ENV === 'production' 
+  ? 'https://skip-go-fast-solver-7uhj8sjcc-chalabi.vercel.app'
+  : 'http://localhost:3000/api/';
+
+  const API_KEY = import.meta.env.VITE_API_KEY;
+
 
 const fetchData = async (endpoint: string) => {
-  const response = await fetch(`/api/${endpoint}`, {
+  const response = await fetch(`${API_URL}${endpoint}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',

@@ -1,8 +1,0 @@
-{
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "https://skip-go-fast-solver-7uhj8sjcc-chalabi.vercel.app/api/:path*"
-    }
-  ]
-}
