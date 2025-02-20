@@ -645,6 +645,7 @@ const AreaChart = React.forwardRef<HTMLDivElement, AreaChartProps>(
         tremor-id="tremor-raw"
         {...other}
       >
+        <p>Daily Fees Earned By Chain</p>
         <ResponsiveContainer>
           <RechartsAreaChart
             data={data}

@@ -4,9 +4,9 @@ import { CHAIN_CONFIGS } from '../utils/metrics';
 import { api } from '../utils/api';
 import type { DashboardState } from '../types/dashboard';
 
-const POLLING_INTERVAL = 30000; // 30 seconds
+const POLLING_INTERVAL = 1000; // 1 second
 const USDC_DECIMALS = 6;
-const STALE_TIME = 30 * 60 * 1000; // 30 minutes
+const STALE_TIME = 1 * 60 * 1000; // 1 minute
 
 
 function formatUSDC(amount: string): string {
@@ -25,7 +25,7 @@ type GasInfo = {
 };
 
 export function useDashboard() {
-  const [selectedChain, setSelectedChain] = useState(CHAIN_CONFIGS[0].domain.toString());
+  const [selectedChain, setSelectedChain] = useState<string>("");
 
   // Query for settlements and sync status
   const { 

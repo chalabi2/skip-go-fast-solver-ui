@@ -15,6 +15,8 @@ import {
 } from "@headlessui/react";
 
 import { AreaChart } from "./charts";
+import { DonutChart, DonutChartEventProps } from "./charts/DonutChart";
+import { TooltipProps } from "./charts/DonutChart";
 
 const transformChainProfitsToChartData = (chainProfits: any) => {
   if (!chainProfits) return [];
@@ -68,6 +70,26 @@ const transformChainProfitsToChartData = (chainProfits: any) => {
   return result;
 };
 
+const transformChainFeesToChartData = (profitMetrics: any) => {
+  if (!profitMetrics) return [];
+
+  return profitMetrics
+    .map((metric: any) => ({
+      name:
+        CHAIN_CONFIGS.find(
+          (config) => config.domain.toString() === metric.chainId
+        )?.name || metric.chainId,
+      amount: Number(metric.metrics?.totalFees || 0) / 1e6, // Convert from BigInt to number and adjust decimals
+    }))
+    .filter((item: any) => item.amount > 0);
+};
+
+// Add this helper function at the top level
+const getChainIdFromName = (chainName: string) => {
+  const chain = CHAIN_CONFIGS.find((config) => config.name === chainName);
+  return chain?.domain.toString() || null;
+};
+
 export const Dashboard: React.FC = () => {
   const { user, signOut } = useAuth();
 
@@ -81,6 +103,14 @@ export const Dashboard: React.FC = () => {
     syncStatus,
     gasInfo,
   } = useDashboard();
+
+  const [selectedFee, setSelectedFee] = React.useState<TooltipProps | null>(
+    null
+  );
+
+  const [selectedDonutSection, setSelectedDonutSection] = React.useState<
+    string | null
+  >(null);
 
   if (isError) {
     return (
@@ -100,75 +130,168 @@ export const Dashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-6 bg-vercel-background">
-        <div className="animate-pulse">
-          <div className="h-8 bg-vercel-card-background rounded w-1/3 mb-8"></div>
-
-          {/* Summary Metrics Skeleton */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="bg-vercel-card-background border border-vercel-border rounded-lg shadow p-6"
-              >
-                <div className="h-4 bg-vercel-muted rounded w-2/3 mb-4"></div>
-                <div className="h-8 bg-vercel-muted rounded w-1/2"></div>
+      <div className="min-h-screen bg-vercel-background text-vercel-foreground">
+        {/* Header - Always visible */}
+        <div className="border-b border-vercel-border bg-vercel-background/50 backdrop-blur-sm sticky top-0 z-10">
+          <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col sm:flex-row justify-between items-center py-4 gap-4">
+              <div className="flex items-center gap-4 w-full sm:w-auto justify-center sm:justify-start">
+                <img
+                  src="/favicon.svg"
+                  alt="Skip Go Fast Solver"
+                  className="w-22 h-22"
+                />
+                <h1 className="text-2xl font-bold text-vercel-foreground">
+                  Skip Go Fast Solver Dashboard
+                </h1>
               </div>
-            ))}
-          </div>
+              <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 w-full sm:w-auto">
+                {/* Sync Status Skeleton */}
+                <div className="flex items-center gap-2">
+                  <div className="h-4 bg-vercel-muted rounded w-40"></div>
+                  <div className="w-2 h-2 rounded-full bg-vercel-muted"></div>
+                </div>
 
-          {/* Chain Profits Skeleton */}
-          <div className="h-6 bg-vercel-card-background rounded w-1/4 mb-4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div
-                key={i}
-                className="bg-vercel-card-background border border-vercel-border rounded-lg shadow p-6"
-              >
-                <div className="h-4 bg-vercel-muted rounded w-1/3 mb-2"></div>
-                <div className="h-6 bg-vercel-muted rounded w-1/2 mb-2"></div>
-                <div className="h-3 bg-vercel-muted rounded w-1/4"></div>
+                <div className="size-10 rounded-full items-center justify-center flex bg-vercel-card-background border border-vercel-border">
+                  <div className="h-5 w-5 bg-vercel-muted rounded"></div>
+                </div>
               </div>
-            ))}
+            </div>
           </div>
+        </div>
 
-          {/* Settlement Details Skeleton */}
-          <div className="h-6 bg-vercel-card-background rounded w-1/4 mb-4"></div>
-          <div className="bg-vercel-card-background border border-vercel-border rounded-lg overflow-x-auto mb-8">
-            <div className="flex gap-2 mb-4">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-8 bg-vercel-muted rounded w-24"></div>
+        {/* Main Content */}
+        <div className="p-6 bg-vercel-background">
+          <div className="animate-pulse">
+            {/* Summary Metrics Skeleton - Updated to 5 columns */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div
+                  key={i}
+                  className="bg-vercel-card-background border border-vercel-border rounded-lg p-6"
+                >
+                  <div className="h-6 bg-vercel-muted rounded w-3/4 mb-4"></div>
+                  <div className="h-8 bg-vercel-muted rounded w-2/3"></div>
+                  {i === 1 && (
+                    <div className="h-4 bg-vercel-muted rounded w-1/2 mt-2"></div>
+                  )}
+                </div>
               ))}
             </div>
-            <table className="min-w-full">
-              <thead>
-                <tr>
-                  {["Order ID", "Amount", "Profit", "Time"].map((header) => (
-                    <th key={header} className="text-left px-4 py-2">
-                      <div className="h-4 bg-vercel-muted rounded w-20"></div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <tr key={i} className="border-t">
-                    <td className="px-4 py-2">
-                      <div className="h-4 bg-vercel-muted rounded w-16"></div>
-                    </td>
-                    <td className="px-4 py-2">
-                      <div className="h-4 bg-vercel-muted rounded w-24"></div>
-                    </td>
-                    <td className="px-4 py-2">
-                      <div className="h-4 bg-vercel-muted rounded w-20"></div>
-                    </td>
-                    <td className="px-4 py-2">
-                      <div className="h-4 bg-vercel-muted rounded w-32"></div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+            {/* Chain Profits Section */}
+            <div className="h-8 bg-vercel-muted rounded w-40 mb-4"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div
+                  key={i}
+                  className="bg-vercel-card-background border border-vercel-border rounded-lg p-6"
+                >
+                  <div className="h-6 bg-vercel-muted rounded w-1/3 mb-4"></div>
+                  <div className="h-8 bg-vercel-muted rounded w-2/3 mb-2"></div>
+                  <div className="h-4 bg-vercel-muted rounded w-1/2"></div>
+                </div>
+              ))}
+            </div>
+
+            {/* Settlements Section */}
+            <div className="h-8 bg-vercel-muted rounded w-48 mb-4"></div>
+            <div className="bg-vercel-card-background border border-vercel-border rounded-lg p-4 mb-8">
+              <div className="overflow-x-auto">
+                <table className="min-w-full">
+                  <thead>
+                    <tr>
+                      {[
+                        "Chain",
+                        "Order ID",
+                        "Amount",
+                        "Profit",
+                        "Time",
+                        "Actions",
+                      ].map((header) => (
+                        <th
+                          key={header}
+                          className="text-left px-4 py-2 border-b border-vercel-border"
+                        >
+                          <div className="h-4 bg-vercel-muted rounded w-20"></div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <tr key={i}>
+                        <td className="px-4 py-3 border-b border-vercel-border">
+                          <div className="h-4 bg-vercel-muted rounded w-24"></div>
+                        </td>
+                        <td className="px-4 py-3 border-b border-vercel-border">
+                          <div className="h-4 bg-vercel-muted rounded w-32"></div>
+                        </td>
+                        <td className="px-4 py-3 border-b border-vercel-border">
+                          <div className="h-4 bg-vercel-muted rounded w-24"></div>
+                        </td>
+                        <td className="px-4 py-3 border-b border-vercel-border">
+                          <div className="h-4 bg-vercel-muted rounded w-20"></div>
+                        </td>
+                        <td className="px-4 py-3 border-b border-vercel-border">
+                          <div className="h-4 bg-vercel-muted rounded w-32"></div>
+                        </td>
+                        <td className="px-4 py-3 border-b border-vercel-border">
+                          <div className="h-4 bg-vercel-muted rounded w-16"></div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Gas Section */}
+            <div className="h-8 bg-vercel-muted rounded w-36 mb-4"></div>
+            <div className="bg-vercel-card-background border border-vercel-border rounded-lg p-4 mb-8">
+              <div className="overflow-x-auto">
+                <table className="min-w-full">
+                  <thead>
+                    <tr>
+                      {["Chain", "Balance", "Deposited", "USD Value"].map(
+                        (header) => (
+                          <th
+                            key={header}
+                            className="text-left px-4 py-2 border-b border-vercel-border"
+                          >
+                            <div className="h-4 bg-vercel-muted rounded w-24"></div>
+                          </th>
+                        )
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[1, 2, 3, 4].map((i) => (
+                      <tr key={i}>
+                        <td className="px-4 py-3 border-b border-vercel-border">
+                          <div className="h-4 bg-vercel-muted rounded w-24"></div>
+                        </td>
+                        <td className="px-4 py-3 border-b border-vercel-border">
+                          <div className="h-4 bg-vercel-muted rounded w-32"></div>
+                        </td>
+                        <td className="px-4 py-3 border-b border-vercel-border">
+                          <div className="h-4 bg-vercel-muted rounded w-28"></div>
+                        </td>
+                        <td className="px-4 py-3 border-b border-vercel-border">
+                          <div className="h-4 bg-vercel-muted rounded w-24"></div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Chart Section */}
+            <div className="h-8 bg-vercel-muted rounded w-36 mb-4"></div>
+            <div className="bg-vercel-card-background border border-vercel-border p-4 rounded-lg">
+              <div className="h-80 bg-vercel-muted rounded"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -232,6 +355,30 @@ export const Dashboard: React.FC = () => {
       const totalProfitUSD = Number(this.totalProfit) / 1e6;
       return totalProfitUSD - this.gasSpent;
     },
+  };
+
+  const handleDonutChartSelection = (value: DonutChartEventProps) => {
+    if (value && "categoryClicked" in value) {
+      const chainName = value.categoryClicked;
+      setSelectedDonutSection((prev) =>
+        prev === chainName ? null : chainName
+      );
+
+      // Update selectedChain when donut selection changes
+      if (chainName) {
+        const chainId = getChainIdFromName(chainName);
+        if (chainId) {
+          setSelectedChain(chainId);
+        }
+      } else {
+        // Set to empty string to show all settlements
+        setSelectedChain("");
+      }
+    } else {
+      setSelectedDonutSection(null);
+      // Set to empty string to show all settlements
+      setSelectedChain("");
+    }
   };
 
   return (
@@ -325,116 +472,155 @@ export const Dashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Summary Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-          <div className="bg-vercel-card-background border border-vercel-border p-6 rounded-lg hover:bg-vercel-card-hovered transition-all">
-            <h2 className="text-xl font-semibold mb-2 text-vercel-foreground">
-              Total Orders Settled
-            </h2>
-            <p className="text-3xl">
-              <span className="text-vercel-success">{totalOrders}</span>
-
-              {" / "}
-              <span className="text-red-500">{totalOrdersTotal}</span>
-            </p>
+        {/* Info Card */}
+        <div className="bg-vercel-card-background border border-vercel-border p-6 rounded-lg transition-all mb-8">
+          {/* Title */}
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-vercel-foreground">
+              Chandra Station Solver Metrics
+            </h1>
           </div>
 
-          <div className="bg-vercel-card-background border border-vercel-border p-6 rounded-lg hover:bg-vercel-card-hovered transition-all">
-            <h2 className="text-xl font-semibold mb-2 text-vercel-foreground">
-              Total Volume All Time
-            </h2>
-            <p className="text-3xl text-vercel-foreground">
-              $
-              {(Number(totalVolume) / 1e6).toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </p>
-          </div>
-
-          <div className="bg-vercel-card-background border border-vercel-border p-6 rounded-lg hover:bg-vercel-card-hovered transition-all">
-            <h2 className="text-xl font-semibold mb-2 text-vercel-foreground">
-              Total Profit
-            </h2>
-            <p className="text-3xl text-vercel-success">
-              $
-              {profitCalculations.netProfit.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </p>
-          </div>
-
-          <div className="bg-vercel-card-background border border-vercel-border p-6 rounded-lg hover:bg-vercel-card-hovered transition-all">
-            <h2 className="text-xl font-semibold mb-2 text-vercel-foreground">
-              Total Fees All Time
-            </h2>
-            <p className="text-3xl text-vercel-success">
-              $
-              {(Number(totalFees) / 1e6).toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </p>
-            <p className="text-sm text-vercel-secondary">
-              {totalVolume > 0
-                ? ((Number(totalFees) / Number(totalVolume)) * 100).toFixed(3)
-                : "0.000"}
-              % fee
-            </p>
-          </div>
-
-          <div className="bg-vercel-card-background border border-vercel-border p-6 rounded-lg hover:bg-vercel-card-hovered transition-all">
-            <h2 className="text-xl font-semibold mb-2 text-vercel-foreground">
-              Largest Order
-            </h2>
-            <p className="text-3xl text-vercel-foreground">
-              ${largestOrder.toLocaleString()}
-            </p>
-            <p className="text-sm text-vercel-secondary">
-              Fee {(largestOrder * 0.001).toFixed(4)} USDC
-            </p>
-          </div>
-        </div>
-
-        {/* Chain Profits */}
-        <h2 className="text-2xl font-bold mb-4 text-vercel-foreground">
-          Chain Profits
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {CHAIN_CONFIGS.map((config) => {
-            const profits = chainProfits?.[config.domain.toString()];
-            if (!profits) return null;
-
-            return (
-              <div
-                key={config.domain}
-                className={`bg-vercel-card-background border border-vercel-border p-6 rounded-lg transition-all cursor-pointer
-                  ${
-                    selectedChain === config.domain.toString()
-                      ? "ring-2 ring-vercel-primary"
-                      : "hover:bg-vercel-card-hovered"
-                  }`}
-                onClick={() =>
-                  setSelectedChain(
-                    selectedChain === config.domain.toString()
-                      ? ""
-                      : config.domain.toString()
-                  )
-                }
-              >
-                <h3 className="text-lg font-semibold mb-2 text-vercel-foreground">
-                  {config.name}
-                </h3>
-                <div className="text-2xl font-bold text-vercel-success">
-                  {Number(profits.totalProfit).toLocaleString()} USDC
-                </div>
-                <div className="text-sm text-vercel-secondary">
-                  From {profits.ordersWithProfits.length} orders
+          {/* Content Row - Modified for mobile responsiveness */}
+          <div className="flex flex-col lg:flex-row gap-6 mb-4">
+            {/* Donut Chart Section */}
+            <div className="w-full lg:w-1/4">
+              <div className="bg-vercel-card-background border border-vercel-border p-6 rounded-lg hover:bg-vercel-card-hovered transition-all">
+                <div className="flex flex-col justify-center items-center h-full">
+                  <p className="text-xl font-semibold text-vercel-success transition-all duration-300 ease-in-out">
+                    $
+                    <span className="inline-block transition-all duration-300 ease-in-out">
+                      {selectedDonutSection
+                        ? transformChainFeesToChartData(profitMetrics)
+                            .find((item) => item.name === selectedDonutSection)
+                            ?.amount.toLocaleString()
+                        : selectedFee?.payload?.[0]?.value?.toLocaleString() ??
+                          (Number(totalFees) / 1e6).toLocaleString()}
+                    </span>
+                  </p>
+                  <p className="text-sm text-vercel-foreground mb-4 h-5 transition-all duration-300 ease-in-out">
+                    {selectedDonutSection
+                      ? `${selectedDonutSection} Fees`
+                      : selectedFee?.payload?.[0]?.category
+                      ? `${selectedFee.payload[0].category} Fees`
+                      : "Total Fees by Chain"}
+                  </p>
+                  <div className="w-full flex justify-center">
+                    <div className=" aspect-square">
+                      <DonutChart
+                        data={transformChainFeesToChartData(profitMetrics)}
+                        category="name"
+                        value="amount"
+                        onValueChange={handleDonutChartSelection}
+                        valueFormatter={(value) => `$${value.toLocaleString()}`}
+                        tooltipCallback={(props) => {
+                          if (props.active && !selectedDonutSection) {
+                            setSelectedFee(props as unknown as TooltipProps);
+                          } else if (!props.active && !selectedDonutSection) {
+                            setSelectedFee(null);
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-sm mt-4 text-center text-vercel-tertiary">
+                    The total fees earned by the solver from each chain.
+                  </p>
                 </div>
               </div>
-            );
-          })}
+            </div>
+
+            {/* Area Chart */}
+            <div className="w-full lg:flex-1 bg-vercel-card-background border border-vercel-border p-6 rounded-lg">
+              <div className="h-[300px] lg:h-80">
+                <AreaChart
+                  className="h-full"
+                  data={chartData}
+                  index="date"
+                  categories={CHAIN_CONFIGS.map((config) => config.name)}
+                  valueFormatter={(number: number) =>
+                    `$${number.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}`
+                  }
+                  showLegend={true}
+                  showGridLines={true}
+                  startEndOnly={false}
+                  showXAxis={true}
+                  showYAxis={true}
+                  allowDecimals={true}
+                  autoMinValue={true}
+                  connectNulls={true}
+                  yAxisLabel="Profit (USDC)"
+                  xAxisLabel="Date"
+                  minValue={0}
+                  onValueChange={(v) => v}
+                  tickGap={50}
+                  intervalType="equidistantPreserveStart"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Summary Metrics - Modified grid for mobile */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-4">
+            <div className="bg-vercel-card-background border border-vercel-border p-6 rounded-lg hover:bg-vercel-card-hovered transition-all">
+              <h2 className="text-xl font-semibold mb-2 text-vercel-foreground">
+                Orders Settled / Total Orders
+              </h2>
+              <p className="text-3xl">
+                <span className="text-vercel-success">{totalOrders}</span>
+
+                {" / "}
+                <span className="text-red-500">{totalOrdersTotal}</span>
+              </p>
+              <p className="text-sm text-vercel-secondary">
+                {totalOrdersTotal - totalOrders} orders missed
+              </p>
+            </div>
+
+            <div className="bg-vercel-card-background border border-vercel-border p-6 rounded-lg hover:bg-vercel-card-hovered transition-all">
+              <h2 className="text-xl font-semibold mb-2 text-vercel-foreground">
+                Total Volume All Time
+              </h2>
+              <p className="text-3xl text-vercel-foreground">
+                $
+                {(Number(totalVolume) / 1e6).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </p>
+            </div>
+
+            <div className="bg-vercel-card-background border border-vercel-border p-6 rounded-lg hover:bg-vercel-card-hovered transition-all">
+              <h2 className="text-xl font-semibold mb-2 text-vercel-foreground">
+                Total Profit
+              </h2>
+              <p className="text-3xl text-vercel-success">
+                $
+                {profitCalculations.netProfit.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </p>
+              <p className="text-sm text-vercel-secondary">
+                Total Fees - Gas Spent
+              </p>
+            </div>
+
+            <div className="bg-vercel-card-background border border-vercel-border p-6 rounded-lg hover:bg-vercel-card-hovered transition-all">
+              <h2 className="text-xl font-semibold mb-2 text-vercel-foreground">
+                Largest Order
+              </h2>
+              <p className="text-3xl text-vercel-foreground">
+                ${largestOrder.toLocaleString()}
+              </p>
+              <p className="text-sm text-vercel-secondary">
+                Fee {(largestOrder * 0.001).toFixed(4)} USDC
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Settlements Grid */}
@@ -466,35 +652,6 @@ export const Dashboard: React.FC = () => {
               No gas data available
             </div>
           )}
-        </div>
-        <h2 className="text-2xl font-bold mb-4">Daily Profits</h2>
-        <div className="relative bg-vercel-card-background border border-vercel-border p-4 rounded-lg w-full h-full">
-          <AreaChart
-            className="h-80"
-            data={chartData}
-            index="date"
-            categories={CHAIN_CONFIGS.map((config) => config.name)}
-            valueFormatter={(number: number) =>
-              `$${number.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}`
-            }
-            showLegend={true}
-            showGridLines={true}
-            startEndOnly={false}
-            showXAxis={true}
-            showYAxis={true}
-            allowDecimals={true}
-            autoMinValue={true}
-            connectNulls={true}
-            yAxisLabel="Profit (USDC)"
-            xAxisLabel="Date"
-            minValue={0}
-            onValueChange={(v) => v}
-            tickGap={50}
-            intervalType="equidistantPreserveStart"
-          />
         </div>
       </div>
     </div>
