@@ -56,8 +56,8 @@ const apiKeyMiddleware = (req: express.Request, res: express.Response, next: exp
   next();
 };
 
-// Apply middleware to all routes except health check
-app.use(/^(?!\/health).*$/, apiKeyMiddleware);
+// Apply middleware to all routes except health check and cron endpoints
+app.use(/^(?!\/health|\/api\/run-sync|\/api\/update-prices).*$/, apiKeyMiddleware);
 
 // Add a basic health check endpoint
 app.get('/health', (req, res) => {
@@ -67,7 +67,7 @@ app.get('/health', (req, res) => {
 // Remove the cron jobs and create API endpoints instead:
 app.get('/api/run-sync', async (req, res) => {
   const authHeader = req.headers['authorization'];
-  if (!authHeader || authHeader !== process.env.API_KEY) {
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   try {
@@ -95,7 +95,7 @@ app.get('/api/run-sync', async (req, res) => {
 
 app.get('/api/update-prices', async (req, res) => {
   const authHeader = req.headers['authorization'];
-  if (!authHeader || authHeader !== process.env.API_KEY) {
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   try {
