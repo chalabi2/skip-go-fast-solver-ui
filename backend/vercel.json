@@ -13,11 +13,11 @@
   ],
   "crons": [
     {
-      "path": "/api/cron/run-sync",
+      "path": "/api/run-sync",
       "schedule": "0 0 * * *"
     },
     {
-      "path": "/api/cron/update-prices",
+      "path": "/api/update-prices",
       "schedule": "0 12 * * *"
     }
   ],
