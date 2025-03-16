@@ -64,23 +64,12 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Create a separate cron job for price updates every 4 hours
-cron.schedule('0 */4 * * *', async () => {
-  try {
-    logger.info('Starting scheduled token price update');
-    await gasTrackingService.updateTokenPrices();
-  } catch (error) {
-    logger.error('Failed to update token prices:', error);
+// Remove the cron jobs and create API endpoints instead:
+app.get('/api/run-sync', async (req, res) => {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader || authHeader !== process.env.API_KEY) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
-});
-
-// Modify the 5-minute cron to update sync timestamps after successful sync
-cron.schedule('*/5 * * * *', async () => {
-  if (syncService.isSyncing || gasTrackingService.isSyncing) {
-    logger.warn('Previous sync still in progress, skipping this cron run');
-    return;
-  }
-
   try {
     logger.info('Starting parallel sync for all chains');
     await Promise.all([
@@ -97,8 +86,25 @@ cron.schedule('*/5 * * * *', async () => {
     });
 
     logger.info('Completed parallel sync for all chains and updated sync timestamps');
+    res.json({ success: true, message: 'Sync completed successfully' });
   } catch (error) {
     logger.error('Failed parallel sync:', error);
+    res.status(500).json({ error: 'Sync failed', details: error instanceof Error ? error.message : 'Unknown error' });
+  }
+});
+
+app.get('/api/update-prices', async (req, res) => {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader || authHeader !== process.env.API_KEY) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    logger.info('Starting token price update');
+    await gasTrackingService.updateTokenPrices();
+    res.json({ success: true, message: 'Token prices updated successfully' });
+  } catch (error) {
+    logger.error('Failed to update token prices:', error);
+    res.status(500).json({ error: 'Price update failed', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 

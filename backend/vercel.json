@@ -11,6 +11,16 @@
       "dest": "/api/index.ts"
     }
   ],
+  "crons": [
+    {
+      "path": "/api/cron/run-sync",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/update-prices",
+      "schedule": "0 12 * * *"
+    }
+  ],
   "buildCommand": "bun run build",
   "outputDirectory": "dist",
   "devCommand": "bun run dev",
