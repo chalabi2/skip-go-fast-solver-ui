@@ -56,15 +56,14 @@ const apiKeyMiddleware = (req: express.Request, res: express.Response, next: exp
   next();
 };
 
-// Apply middleware to all routes except health check and cron endpoints
-app.use(/^(?!\/health|\/api\/run-sync|\/api\/update-prices).*$/, apiKeyMiddleware);
 
-// Add a basic health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
+app.use('/api/settlements', apiKeyMiddleware);
+app.use('/api/sync-status', apiKeyMiddleware);
+app.use('/api/gas-info', apiKeyMiddleware);
 
-// Remove the cron jobs and create API endpoints instead:
+
+
+
 app.get('/api/run-sync', async (req, res) => {
   const authHeader = req.headers['authorization'];
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -108,7 +107,7 @@ app.get('/api/update-prices', async (req, res) => {
   }
 });
 
-// Add this interface to define the grouped settlements structure
+//  define the grouped settlements structure
 interface GroupedSettlement {
   chainName: string;
   settlements: Array<{
@@ -131,7 +130,7 @@ interface GroupedSettlement {
 // API endpoints
 app.get('/api/settlements', async (req, res) => {
   try {
-    // Remove the sync operation entirely - just fetch existing data
+
     // Get raw count per chain first for verification
     const chainCounts = await prisma.settlement.groupBy({
       by: ['chainId'],
