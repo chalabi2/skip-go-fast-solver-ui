@@ -5,6 +5,7 @@ export const ALLOWED_EMAILS = [
   "chalabi@chandrastation.com",
   "bailey@chandrastation.com",
   "blockchainthomas@gmail.com",
+  "josh@dydx.foundation"
 ];
 
 export const SESSION_TIMEOUT = 60 * 60 * 1000;
